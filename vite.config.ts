@@ -3,5 +3,5 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/ventana_circadiana/", // 👈 este es el cambio necesario
+  base: "/ventana_circadiana/", // ← esta línea es la clave
 });
