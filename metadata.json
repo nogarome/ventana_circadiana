@@ -1,0 +1,7 @@
+{
+  "name": "ventana_circadiana",
+  "description": "A simulation and code generation tool for Arduino-based Circadian Rhythm LED windows. Visualizes light curves and generates C++ firmware.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
