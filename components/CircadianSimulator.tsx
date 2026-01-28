@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Sun, MapPin, Clock, Thermometer, Sliders, Calendar, Navigation, Info, ArrowLeftRight, Bluetooth, Cpu } from 'lucide-react';
+import { Sun, MapPin, Clock, Thermometer, Sliders, Calendar, Navigation, Info, ArrowLeftRight, Bluetooth, Cpu, Radio, Power, Eye } from 'lucide-react';
 import { AppConfig, TimePoint } from '../types';
 import { getSunPosition, kelvinToRgb, formatTime } from '../utils/solar';
 
@@ -12,6 +12,7 @@ interface Props {
 export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) => {
   const [simulationTime, setSimulationTime] = useState<number>(12 * 60); 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRealTime, setIsRealTime] = useState(false); 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
@@ -63,7 +64,6 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
     
     // Convertimos minutos de offset a una "altitud virtual" aproximada (0.25 grados por minuto de rotación terrestre)
     const thresholdShift = offsetMin * 0.25; 
-    
     const effectiveBriStart = config.brightnessStartAlt + thresholdShift;
     
     const brightnessProgress = smoothStep(effectiveBriStart, config.brightnessFullAlt, sunPos);
@@ -107,13 +107,28 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
 
   useEffect(() => {
     let interval: any;
-    if (isPlaying) {
+    if (isPlaying && !isRealTime) {
       interval = setInterval(() => {
         setSimulationTime(prev => (prev + 10) % 1440);
       }, 50);
     }
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, isRealTime]);
+
+  useEffect(() => {
+    let interval: any;
+    const syncTime = () => {
+        const now = new Date();
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        setSimulationTime(minutes);
+    };
+    if (isRealTime) {
+        syncTime();
+        interval = setInterval(syncTime, 10000);
+        setIsPlaying(false);
+    }
+    return () => clearInterval(interval);
+  }, [isRealTime]);
 
   const windowStyle = {
     backgroundColor: kelvinToRgb(currentPoint.kelvin),
@@ -124,7 +139,6 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
 
   const kelvinGradient = "linear-gradient(to right, #ff8a00, #ffc000, #fff4e5, #d6eaff, #a3d2ff)";
 
-  // Components for badges
   const BTBadge = () => (
     <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-blue-200 ml-2" title="Modificable por Bluetooth sin reprogramar">
       <Bluetooth size={10} /> BT
@@ -292,7 +306,7 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center">
-                                Amanecer <ChipBadge />
+                                Amanecer <BTBadge />
                             </label>
                             <span className="text-[10px] font-mono font-bold text-indigo-600">
                               {config.sunriseOffset > 0 ? `+${config.sunriseOffset}` : config.sunriseOffset} min
@@ -304,19 +318,12 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
                             onChange={(e) => updateConfig('sunriseOffset', parseInt(e.target.value))}
                             className="w-full accent-indigo-500 h-1.5"
                           />
-                          <p className="text-[9px] text-slate-500 leading-tight italic">
-                            {config.sunriseOffset < 0 
-                              ? `La ventana se encenderá ${Math.abs(config.sunriseOffset)}m ANTES que el sol.` 
-                              : config.sunriseOffset > 0 
-                              ? `La ventana esperará ${config.sunriseOffset}m DESPUÉS de la salida del sol.`
-                              : "Sincronizado exactamente con la salida del sol."}
-                          </p>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center">
-                                Atardecer <ChipBadge />
+                                Atardecer <BTBadge />
                             </label>
                             <span className="text-[10px] font-mono font-bold text-orange-600">
                               {config.sunsetOffset > 0 ? `+${config.sunsetOffset}` : config.sunsetOffset} min
@@ -328,34 +335,20 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
                             onChange={(e) => updateConfig('sunsetOffset', parseInt(e.target.value))}
                             className="w-full accent-orange-500 h-1.5"
                           />
-                          <p className="text-[9px] text-slate-500 leading-tight italic">
-                            {config.sunsetOffset < 0 
-                              ? `La luz se apagará ${Math.abs(config.sunsetOffset)}m ANTES del atardecer real.` 
-                              : config.sunsetOffset > 0 
-                              ? `La ventana mantendrá luz ${config.sunsetOffset}m EXTRA tras ponerse el sol.`
-                              : "Sincronizado exactamente con la puesta de sol."}
-                          </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Explicación de Umbrales */}
+                    {/* Umbrales de BRILLO */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-600 border-b border-slate-200 pb-2">
-                         <ArrowLeftRight size={14} className="text-amber-500" /> Umbrales de Altitud (Geometría Solar)
+                         <Sun size={14} className="text-amber-500" /> Umbrales de BRILLO
                       </div>
                       
-                      <div className="p-3 bg-amber-50 rounded border border-amber-100 flex gap-2 items-start mb-2">
-                         <Info size={14} className="text-amber-600 mt-0.5 shrink-0" />
-                         <p className="text-[10px] text-amber-800 leading-tight">
-                           Determina la intensidad de la luz basándose en qué tan alto está el sol en el cielo (0° es el horizonte). Estos parámetros definen la curva "suave" de atenuación.
-                         </p>
-                      </div>
-
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center">
-                              Inicio Brillo (Trigger) <ChipBadge />
+                              Inicio (Trigger) <BTBadge />
                           </label>
                           <input 
                             type="number" step="1"
@@ -367,7 +360,7 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase text-amber-600 flex items-center">
-                              Pleno Día (Max) <ChipBadge />
+                              Pleno Día (Max) <BTBadge />
                           </label>
                           <input 
                             type="number" step="1"
@@ -379,6 +372,62 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
                         </div>
                       </div>
                     </div>
+
+                    {/* Umbrales de COLOR (NUEVO) */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600 border-b border-slate-200 pb-2">
+                         <Thermometer size={14} className="text-blue-500" /> Umbrales de COLOR (Kelvin)
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center">
+                              Inicio Enfriado <BTBadge />
+                          </label>
+                          <input 
+                            type="number" step="1"
+                            value={config.kelvinStartAlt}
+                            onChange={(e) => updateConfig('kelvinStartAlt', parseFloat(e.target.value))}
+                            className="w-full p-2 text-xs border border-slate-300 rounded font-mono bg-white text-slate-900"
+                          />
+                          <p className="text-[9px] text-slate-400 italic">Sol bajo ({config.kelvinStartAlt}°)</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase text-blue-600 flex items-center">
+                              Máximo Frío <BTBadge />
+                          </label>
+                          <input 
+                            type="number" step="1"
+                            value={config.kelvinFullAlt}
+                            onChange={(e) => updateConfig('kelvinFullAlt', parseFloat(e.target.value))}
+                            className="w-full p-2 text-xs border border-slate-300 rounded font-mono bg-white text-slate-900"
+                          />
+                          <p className="text-[9px] text-slate-400 italic">Sol alto ({config.kelvinFullAlt}°)</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Warm Bias Control (NUEVO) */}
+                    <div className="space-y-2">
+                       <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
+                                <Eye size={12} /> Warm Bias (Confort) <BTBadge />
+                            </label>
+                            <span className="text-[10px] font-mono font-bold text-slate-600">
+                              {(config.minWarmBias * 100).toFixed(0)}%
+                            </span>
+                       </div>
+                       <input 
+                            type="range" min="0" max="0.5" step="0.05"
+                            value={config.minWarmBias}
+                            onChange={(e) => updateConfig('minWarmBias', parseFloat(e.target.value))}
+                            className="w-full accent-slate-500 h-1.5"
+                       />
+                       <p className="text-[9px] text-slate-500 leading-tight">
+                            Porcentaje de LED cálido que <strong>nunca se apaga</strong>, incluso a mediodía. Evita que la luz se vea demasiado "clínica" o estéril.
+                       </p>
+                    </div>
+
                 </div>
               )}
             </div>
@@ -387,14 +436,22 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
 
         {/* Visualizador de Ventana */}
         <div className="bg-slate-900 rounded-xl p-8 flex flex-col items-center justify-center relative overflow-hidden shadow-inner min-h-[250px]">
+          
+          {isRealTime && (
+            <div className="absolute top-4 right-4 flex items-center gap-2 animate-pulse">
+                <div className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_red]"></div>
+                <span className="text-[10px] font-bold text-red-400 tracking-wider">LIVE MONITOR</span>
+            </div>
+          )}
+
           <div className="absolute top-4 left-4 text-white/50 text-[10px] font-mono z-10 space-y-1">
              <div className="flex items-center gap-2"><Clock size={10} /> {formatTime(currentPoint.hour, currentPoint.minute)}</div>
              <div>{currentPoint.kelvin}K | {currentPoint.brightness}%</div>
              <div className="flex gap-2">
-                <span className="text-amber-400">W: {currentPoint.warm}%</span> 
-                <span className="text-blue-400">C: {currentPoint.cold}%</span>
+                <span className="text-amber-400">W: {currentPoint.warm}</span> 
+                <span className="text-blue-400">C: {currentPoint.cold}</span>
              </div>
-             <div className="text-slate-500 italic">Sol: {currentPoint.sunAltitude.toFixed(1)}° ({getAltitudeLabel(currentPoint.sunAltitude)})</div>
+             <div className="text-slate-500 italic">Sol: {currentPoint.sunAltitude.toFixed(1)}°</div>
           </div>
 
           <div 
@@ -411,26 +468,59 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
           />
         </div>
         
-         <div className="bg-white p-4 rounded-xl shadow-sm border flex items-center gap-4">
-             <button 
-                onClick={() => setIsPlaying(!isPlaying)}
-                className={`p-2 px-4 rounded-lg text-xs font-bold transition-all shadow-sm ${isPlaying ? 'bg-red-500 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'}`}
-             >
-                {isPlaying ? 'PAUSAR' : 'SIMULAR 24H'}
-             </button>
-             <input 
-                type="range" 
-                min="0" max="1439" 
-                value={simulationTime}
-                onChange={(e) => {
-                    setSimulationTime(parseInt(e.target.value));
-                    setIsPlaying(false);
-                }}
-                className="w-full accent-indigo-600 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-             />
-             <div className="text-xs font-mono text-slate-500 w-12 text-right">
-                {formatTime(currentPoint.hour, currentPoint.minute)}
+         <div className="bg-white p-4 rounded-xl shadow-sm border flex flex-col gap-4">
+             {/* CONTROLES DE REPRODUCCION */}
+             <div className="flex items-center gap-3">
+                 <button 
+                    onClick={() => {
+                        setIsRealTime(false);
+                        setIsPlaying(!isPlaying);
+                    }}
+                    disabled={isRealTime}
+                    className={`p-2 px-4 rounded-lg text-xs font-bold transition-all shadow-sm flex-1 ${
+                        isPlaying 
+                        ? 'bg-red-50 text-red-600 border border-red-200' 
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    } ${isRealTime ? 'opacity-30 cursor-not-allowed' : ''}`}
+                 >
+                    {isPlaying ? 'PAUSAR' : 'SIMULAR 24H'}
+                 </button>
+
+                 <button 
+                    onClick={() => setIsRealTime(!isRealTime)}
+                    className={`p-2 px-4 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 flex-1 ${
+                        isRealTime
+                        ? 'bg-red-600 text-white shadow-red-200 ring-2 ring-red-100' 
+                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                    }`}
+                 >
+                    <Radio size={14} className={isRealTime ? "animate-pulse" : ""} />
+                    {isRealTime ? 'EN VIVO (SINC)' : 'MODO MONITOR'}
+                 </button>
              </div>
+             
+             <div className="flex items-center gap-4">
+                 <input 
+                    type="range" 
+                    min="0" max="1439" 
+                    value={simulationTime}
+                    disabled={isRealTime}
+                    onChange={(e) => {
+                        setSimulationTime(parseInt(e.target.value));
+                        setIsPlaying(false);
+                    }}
+                    className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${isRealTime ? 'bg-slate-100 accent-slate-300' : 'bg-slate-100 accent-indigo-600'}`}
+                 />
+                 <div className="text-xs font-mono text-slate-500 w-12 text-right">
+                    {formatTime(currentPoint.hour, currentPoint.minute)}
+                 </div>
+             </div>
+             
+             {isRealTime && (
+                <div className="text-[10px] text-center text-slate-400 bg-slate-50 p-1 rounded">
+                    Mostrando estado calculado para tu hora local ({new Date().toLocaleTimeString()}). Coincide con el Arduino.
+                </div>
+             )}
          </div>
       </div>
 
@@ -489,33 +579,18 @@ export const CircadianSimulator: React.FC<Props> = ({ config, updateConfig }) =>
                     name="Frío (C)"
                 />
 
-                <ReferenceLine yAxisId="left" x={currentPoint.hour + (currentPoint.minute/60)} stroke="#ef4444" strokeWidth={2} strokeDasharray="3 3" />
+                <ReferenceLine yAxisId="left" x={currentPoint.hour + (currentPoint.minute/60)} stroke={isRealTime ? "#ef4444" : "#94a3b8"} strokeWidth={2} strokeDasharray="3 3" />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-          
-          <div className="mt-6 grid grid-cols-2 gap-4 text-center">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Rango Hardware</div>
-                <div className="text-xs text-slate-700 font-mono font-bold">
-                    {config.minKelvin}K - {config.maxKelvin}K
-                </div>
-            </div>
-            <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                <div className="text-[10px] text-indigo-400 font-bold uppercase mb-1">Cénit Solar</div>
-                <div className="text-xs text-indigo-700 font-mono font-bold">
-                    Máx: {Math.max(...chartData.map(p => p.sunAltitude)).toFixed(1)}°
-                </div>
-            </div>
           </div>
         </div>
 
         <div className="bg-indigo-900 p-6 rounded-xl border border-indigo-800 text-indigo-100">
            <h4 className="font-bold mb-2 flex items-center gap-2 text-sm">
-            <Sun size={16} /> Inteligencia Ambiental
+            <Radio size={16} className="text-red-400" /> Sobre el Monitor en Vivo
            </h4>
            <p className="text-xs leading-relaxed opacity-80">
-             Usa los **Offsets** para sincronizar la luz con tu estilo de vida. Si trabajas hasta tarde, un offset positivo en el atardecer te ayudará a mantenerte activo. Si te cuesta despertar, prueba un offset negativo en el amanecer.
+             Los navegadores web no pueden conectarse a Bluetooth clásico (HC-05). Sin embargo, como esta web y tu Arduino comparten el mismo código matemático, el <strong>Modo Monitor</strong> te muestra exactamente lo que el Arduino está haciendo ahora mismo, sin necesidad de conectarse.
            </p>
         </div>
       </div>
