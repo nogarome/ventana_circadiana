@@ -1,5 +1,5 @@
 import React from "react";
-console.log("Despliegue automático funcionando");
+
 export const WiringDiagram: React.FC = () => {
   return (
     <div className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto shadow-inner">

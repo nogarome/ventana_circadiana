@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { AppConfig, TimePoint } from "../types";
 import { getSunPosition, kelvinToRgb, formatTime } from "../utils/solar";
-console.log("Despliegue automático funcionando");
+
 interface Props {
   config: AppConfig;
   updateConfig: (key: keyof AppConfig, value: any) => void;
