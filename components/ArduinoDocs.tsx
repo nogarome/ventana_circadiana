@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Book, Bluetooth, Smartphone, Terminal, Settings, PlayCircle, Moon, Sun, Save, RefreshCw, ToggleLeft, Hash, AlertTriangle, CheckCircle2, XCircle, MapPin, SearchX, HelpCircle, Command, Clock, Copy, Radio } from 'lucide-react';
+import { Book, Bluetooth, Smartphone, Terminal, Settings, PlayCircle, Moon, Sun, Save, RefreshCw, ToggleLeft, Hash, AlertTriangle, CheckCircle2, XCircle, MapPin, SearchX, HelpCircle, Command, Clock, Copy } from 'lucide-react';
 
 export const ArduinoDocs: React.FC = () => {
   const [currentTimeCmd, setCurrentTimeCmd] = useState('');
@@ -71,27 +71,6 @@ export const ArduinoDocs: React.FC = () => {
              </div>
         </div>
       </section>
-
-      {/* FAQ BLUETOOTH WEB */}
-      <section className="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-slate-300">
-         <div className="flex items-start gap-4">
-             <div className="bg-slate-700 p-3 rounded-full text-slate-200 shrink-0">
-                <Radio size={24} />
-             </div>
-             <div>
-                <h3 className="text-lg font-bold text-white mb-2">¿Puedo ver los datos en vivo en esta Web?</h3>
-                <p className="text-sm leading-relaxed mb-4">
-                    <strong>Técnicamente no por Bluetooth.</strong> Los navegadores web (Chrome, Safari) bloquean por seguridad la conexión a dispositivos Bluetooth antiguos como el HC-05. Solo permiten dispositivos BLE modernos.
-                </p>
-                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-600">
-                    <h4 className="text-green-400 font-bold text-xs uppercase mb-2">La Solución: Modo Monitor</h4>
-                    <p className="text-xs">
-                        Como esta web contiene el mismo "cerebro matemático" que el Arduino, hemos creado el botón <strong>"MODO MONITOR"</strong> en la pestaña Simulador. Al activarlo, la web se sincroniza con tu hora local y te muestra exactamente lo que el Arduino debería estar haciendo en ese segundo.
-                    </p>
-                </div>
-             </div>
-         </div>
-      </section>
       
       {/* CHEATSHEET DE COMANDOS */}
       <section className="bg-slate-900 text-slate-200 p-8 rounded-2xl shadow-xl overflow-hidden relative">
@@ -159,38 +138,23 @@ export const ArduinoDocs: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1">
                         <span className="text-cyan-400">MINK:X</span>
-                        <span className="text-slate-500">K Mín (ej: 3000)</span>
+                        <span className="text-slate-500">Kelvin Mín (ej: 2700)</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1">
                         <span className="text-cyan-400">MAXK:X</span>
-                        <span className="text-slate-500">K Máx (ej: 6000)</span>
-                    </div>
-                    
-                    {/* Nuevos V4.5 */}
-                    <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1 pt-2">
-                        <span className="text-fuchsia-400">KSTART:X</span>
-                        <span className="text-slate-500">K Trigger (ej: -4.0)</span>
+                        <span className="text-slate-500">Kelvin Máx (ej: 6500)</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1">
-                        <span className="text-fuchsia-400">KFULL:X</span>
-                        <span className="text-slate-500">K Max (ej: 20.0)</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1">
-                        <span className="text-fuchsia-400">WARMBIAS:X</span>
-                        <span className="text-slate-500">Bias (ej: 0.25)</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1 pt-2">
                         <span className="text-orange-400">SUNRISE:X</span>
-                        <span className="text-slate-500">Offset (min, ej: -15)</span>
+                        <span className="text-slate-500">Offset Amanecer (mins)</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1">
                         <span className="text-orange-400">SUNSET:X</span>
-                        <span className="text-slate-500">Offset (min, ej: 60)</span>
+                        <span className="text-slate-500">Offset Atardecer (mins)</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1 pt-2">
+                    <div className="grid grid-cols-2 gap-2 border-b border-slate-800 pb-1">
                         <span className="text-yellow-400">SETTIME:...</span>
-                        <span className="text-slate-500">Ej: 202401271830</span>
+                        <span className="text-slate-500">SETTIME:202401011200</span>
                     </div>
                 </div>
             </div>

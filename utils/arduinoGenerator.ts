@@ -1,29 +1,34 @@
 import { AppConfig } from "../types";
 
 export const generateArduinoSketch = (config: AppConfig): string => {
-  const { 
-      location, nightBrightness, minKelvin, maxKelvin, maxBrightness, 
-      brightnessStartAlt, brightnessFullAlt, minWarmBias, 
-      kelvinStartAlt, kelvinFullAlt
+  const {
+    location,
+    nightBrightness,
+    minKelvin,
+    maxKelvin,
+    maxBrightness,
+    brightnessStartAlt,
+    brightnessFullAlt,
+    minWarmBias,
   } = config;
 
-  // Calculamos valores iniciales por defecto
   const defLat = location.lat;
   const defLon = location.lng;
-  
-  return `/*
-  CONTROLADOR DE VENTANA CIRCADIANA (Luminia V4.5 - Advanced Color Control)
+  const warmBiasLimit = (1.0 - minWarmBias).toFixed(2);
+
+  return String.raw`/*
+  CONTROLADOR DE VENTANA CIRCADIANA (Luminia V4.4 - Time Sync Fix)
   -----------------------------------------------
-  Control total desde el móvil incluyendo curvas de color.
+  Control total desde el móvil.
   
-  NUEVOS COMANDOS COLOR (V4.5):
-  KSTART:X   -> Altitud solar donde empieza a enfriarse (Ej: -4.0)
-  KFULL:X    -> Altitud solar donde alcanza el blanco máximo (Ej: 20.0)
-  WARMBIAS:X -> % de LED cálido que SIEMPRE se queda encendido (0.0 - 1.0)
+  FIX HORA INCORRECTA:
+  Si el reloj marca una hora rara (ej: 2026), usa el comando:
+  SETTIME:YYYYMMDDHHMM (Ej: SETTIME:202401271745)
   
-  COMANDOS BASICOS:
-  STATUS, SAVE, RESET, SETTIME:YYYYMMDDHHMM
-  LAT:X, LNG:X, MINK:X, MAXK:X
+  COMANDOS BLUETOOTH:
+  > Atajos: 'd' (Demo), 'n' (Noche), '+' (Max), '-' (Min)
+  > Config: STATUS, SAVE, RESET
+  > Hora:   SETTIME:202401011200
 */
 
 #include <Wire.h>
@@ -57,14 +62,11 @@ struct Config {
   float briStartAlt;    
   float briFullAlt;     
   int sunriseOffset;    
-  int sunsetOffset;
-  float kStartAlt;      // Nuevo V4.5
-  float kFullAlt;       // Nuevo V4.5
-  float warmBias;       // Nuevo V4.5 (0.0 - 1.0)
+  int sunsetOffset;     
 };
 
 Config conf;
-const byte MAGIC_NUMBER = 0x45; // Version bump para forzar recarga defaults
+const byte MAGIC_NUMBER = 0x43; 
 
 RTC_DS3231 rtc;
 SoftwareSerial bt(BT_RX, BT_TX);
@@ -83,37 +85,29 @@ void loadConfig() {
   if (conf.magic != MAGIC_NUMBER) {
     Serial.println("EEPROM vacia o antigua. Cargando defaults...");
     conf.magic = MAGIC_NUMBER;
-    conf.lat = ${defLat};
-    conf.lon = ${defLon};
-    conf.minK = ${minKelvin};
-    conf.maxK = ${maxKelvin};
-    conf.maxBri = ${maxBrightness};
-    conf.nightBri = ${nightBrightness};
-    conf.briStartAlt = ${brightnessStartAlt};
-    conf.briFullAlt = ${brightnessFullAlt};
-    conf.sunriseOffset = ${config.sunriseOffset};
-    conf.sunsetOffset = ${config.sunsetOffset};
-    // Nuevos defaults V4.5
-    conf.kStartAlt = ${kelvinStartAlt};
-    conf.kFullAlt = ${kelvinFullAlt};
-    conf.warmBias = ${minWarmBias};
-    
+    conf.lat = \${defLat};
+    conf.lon = \${defLon};
+    conf.minK = \${minKelvin};
+    conf.maxK = \${maxKelvin};
+    conf.maxBri = \${maxBrightness};
+    conf.nightBri = \${nightBrightness};
+    conf.briStartAlt = \${brightnessStartAlt};
+    conf.briFullAlt = \${brightnessFullAlt};
+    conf.sunriseOffset = \${config.sunriseOffset};
+    conf.sunsetOffset = \${config.sunsetOffset};
     EEPROM.put(0, conf); 
   }
 }
 
 void printStatus() {
   DateTime now = rtc.now();
-  bt.println(F("--- ESTADO LUMINIA V4.5 ---"));
+  bt.println(F("--- ESTADO LUMINIA ---"));
   bt.print(F("HORA: ")); 
   bt.print(now.year()); bt.print('/'); bt.print(now.month()); bt.print('/'); bt.print(now.day());
   bt.print(' '); bt.print(now.hour()); bt.print(':'); bt.println(now.minute());
   
-  bt.print(F("LAT/LON: ")); bt.print(conf.lat); bt.print("/"); bt.println(conf.lon);
+  bt.print(F("LAT: ")); bt.print(conf.lat); bt.print(" LON: "); bt.println(conf.lon);
   bt.print(F("K Range: ")); bt.print(conf.minK); bt.print("-"); bt.println(conf.maxK);
-  bt.print(F("Bri Curve (Start/Full): ")); bt.print(conf.briStartAlt); bt.print("/"); bt.println(conf.briFullAlt);
-  bt.print(F("Color Curve (Start/Full): ")); bt.print(conf.kStartAlt); bt.print("/"); bt.println(conf.kFullAlt);
-  bt.print(F("Warm Bias: ")); bt.println(conf.warmBias);
   
   if (isNightMode) bt.println(F("[MODO NOCHE ACTIVO]"));
   if (isDemoMode) bt.println(F("[MODO DEMO ACTIVO]"));
@@ -146,7 +140,7 @@ void processCommand(String cmd) {
      bt.print("NIVEL: "); bt.println(currentLevelIdx);
   }
 
-  // --- COMANDOS TECNICOS ---
+  // --- CONFIGURACION TECNICA ---
   else if (cmd == "STATUS") {
     printStatus();
   } 
@@ -159,6 +153,7 @@ void processCommand(String cmd) {
     delay(100);
     resetFunc();
   }
+  // --- CORRECCION DE HORA ---
   else if (cmd.startsWith("SETTIME:")) {
       String t = cmd.substring(8);
       if (t.length() >= 12) {
@@ -169,30 +164,55 @@ void processCommand(String cmd) {
           int mn = t.substring(10, 12).toInt();
           
           rtc.adjust(DateTime(y, m, d, h, mn, 0));
-          bt.println("HORA OK");
+          bt.println("HORA ACTUALIZADA CORRECTAMENTE");
+          printStatus();
+      } else {
+          bt.println("ERROR. USE: SETTIME:YYYYMMDDHHMM");
       }
   }
-  // --- PARAMETROS DE CONFIGURACION ---
-  else if (cmd.startsWith("LAT:")) { conf.lat = cmd.substring(4).toFloat(); bt.println("OK"); }
-  else if (cmd.startsWith("LNG:")) { conf.lon = cmd.substring(4).toFloat(); bt.println("OK"); }
-  else if (cmd.startsWith("MAXBRI:")) { conf.maxBri = cmd.substring(7).toInt(); bt.println("OK"); }
-  else if (cmd.startsWith("NIGHTBRI:")) { conf.nightBri = cmd.substring(9).toInt(); bt.println("OK"); }
-  else if (cmd.startsWith("MINK:")) { conf.minK = cmd.substring(5).toInt(); bt.println("OK"); }
-  else if (cmd.startsWith("MAXK:")) { conf.maxK = cmd.substring(5).toInt(); bt.println("OK"); }
-  
-  else if (cmd.startsWith("SUNRISE:")) { conf.sunriseOffset = cmd.substring(8).toInt(); bt.println("OK"); }
-  else if (cmd.startsWith("SUNSET:")) { conf.sunsetOffset = cmd.substring(7).toInt(); bt.println("OK"); }
-  
-  else if (cmd.startsWith("BRISTART:")) { conf.briStartAlt = cmd.substring(9).toFloat(); bt.println("OK"); }
-  else if (cmd.startsWith("BRIFULL:")) { conf.briFullAlt = cmd.substring(8).toFloat(); bt.println("OK"); }
-  
-  // NUEVOS V4.5
-  else if (cmd.startsWith("KSTART:")) { conf.kStartAlt = cmd.substring(7).toFloat(); bt.println("OK"); }
-  else if (cmd.startsWith("KFULL:")) { conf.kFullAlt = cmd.substring(6).toFloat(); bt.println("OK"); }
-  else if (cmd.startsWith("WARMBIAS:")) { conf.warmBias = cmd.substring(9).toFloat(); bt.println("OK"); }
-
+  // GEO Y PARAMETROS
+  else if (cmd.startsWith("LAT:")) {
+    conf.lat = cmd.substring(4).toFloat();
+    bt.print("OK LAT: "); bt.println(conf.lat);
+  }
+  else if (cmd.startsWith("LNG:")) {
+    conf.lon = cmd.substring(4).toFloat();
+    bt.print("OK LNG: "); bt.println(conf.lon);
+  }
+  else if (cmd.startsWith("MAXBRI:")) {
+    conf.maxBri = cmd.substring(7).toInt();
+    bt.print("OK MaxBri: "); bt.println(conf.maxBri);
+  }
+  else if (cmd.startsWith("NIGHTBRI:")) {
+    conf.nightBri = cmd.substring(9).toInt();
+    bt.print("OK NightBri: "); bt.println(conf.nightBri);
+  }
+  else if (cmd.startsWith("MINK:")) {
+    conf.minK = cmd.substring(5).toInt();
+    bt.print("OK MinK: "); bt.println(conf.minK);
+  }
+  else if (cmd.startsWith("MAXK:")) {
+    conf.maxK = cmd.substring(5).toInt();
+    bt.print("OK MaxK: "); bt.println(conf.maxK);
+  }
+  else if (cmd.startsWith("SUNRISE:")) {
+    conf.sunriseOffset = cmd.substring(8).toInt();
+    bt.print("OK SunRise Off: "); bt.println(conf.sunriseOffset);
+  }
+  else if (cmd.startsWith("SUNSET:")) {
+    conf.sunsetOffset = cmd.substring(7).toInt();
+    bt.print("OK SunSet Off: "); bt.println(conf.sunsetOffset);
+  }
+  else if (cmd.startsWith("BRISTART:")) {
+    conf.briStartAlt = cmd.substring(9).toFloat();
+    bt.print("OK CurveStart: "); bt.println(conf.briStartAlt);
+  }
+  else if (cmd.startsWith("BRIFULL:")) {
+    conf.briFullAlt = cmd.substring(8).toFloat();
+    bt.print("OK CurveFull: "); bt.println(conf.briFullAlt);
+  }
   else {
-    if (cmd.length() > 0) bt.println("CMD ?? (Usa STATUS)");
+    if (cmd.length() > 0) bt.println("CMD ?? (Prueba: STATUS, SAVE, SETTIME:...)");
   }
 }
 
@@ -215,8 +235,8 @@ void setup() {
   if (rtc.lostPower()) { rtc.adjust(DateTime(F(__DATE__), F(__TIME__))); }
 
   loadConfig();
-  Serial.println("Luminia V4.5 Iniciado");
-  bt.println("LUMINIA V4.5 READY");
+  Serial.println("Luminia V4.4 Iniciado");
+  bt.println("LUMINIA READY. Usa STATUS para ver info.");
 }
 
 void updateIndicators() {
@@ -269,10 +289,7 @@ void applyLight(int kelvin, int bri) {
   }
   
   float ratio = (float)(kelvin - conf.minK) / (conf.maxK - conf.minK);
-  
-  // APLICAR WARM BIAS CONFIGURABLE
-  float biasLimit = 1.0 - conf.warmBias;
-  ratio = constrain(ratio, 0.0, biasLimit); 
+  ratio = constrain(ratio, 0.0, \${warmBiasLimit}); 
   
   analogWrite(PIN_WARM, (1.0 - ratio) * finalBri);
   analogWrite(PIN_COLD, ratio * finalBri);
@@ -300,33 +317,46 @@ void loop() {
   }
 
   float alt = getSunAltitude(now);
-  
-  // 1. CALCULO BRILLO (Usa offsets horarios)
   int offsetMin = (now.hour() < 12) ? conf.sunriseOffset : -conf.sunsetOffset;
   float effectiveStart = conf.briStartAlt + (offsetMin * 0.25);
+  
   float briSpan = conf.briFullAlt - effectiveStart;
   if(briSpan <= 0) briSpan = 1.0; 
+  
   float bFact = constrain((alt - effectiveStart) / briSpan, 0.0, 1.0);
   int targetBri = bFact * 255;
   
-  // 2. CALCULO COLOR (Usa curva configurable KSTART/KFULL)
-  float kSpan = conf.kFullAlt - conf.kStartAlt;
-  if (kSpan <= 0) kSpan = 1.0;
-  float kFact = constrain((alt - conf.kStartAlt) / kSpan, 0.0, 1.0);
+  float kFact = constrain((alt - effectiveStart) / 20.0, 0.0, 1.0);
   int targetK = conf.minK + (conf.maxK - conf.minK) * kFact;
 
   applyLight(targetK, targetBri);
   
-  // --- LOGGING ---
   static unsigned long lastLog = 0;
   if (millis() - lastLog > 1000) {
     lastLog = millis();
-    Serial.print(now.hour()); Serial.print(':'); Serial.print(now.minute());
-    Serial.print(" | K: "); Serial.print(targetK);
-    Serial.print(" | B: "); Serial.print(targetBri);
-    Serial.print(" | Sol: "); Serial.println(alt);
+    
+    Serial.print(now.year()); Serial.print('/');
+    Serial.print(now.month()); Serial.print('/');
+    Serial.print(now.day()); Serial.print(" ");
+    
+    if (now.hour() < 10) Serial.print('0');
+    Serial.print(now.hour()); Serial.print(':');
+    if (now.minute() < 10) Serial.print('0');
+    Serial.print(now.minute()); Serial.print(':');
+    if (now.second() < 10) Serial.print('0');
+    Serial.print(now.second());
+    
+    Serial.print(" | Temp: "); Serial.print(targetK); Serial.print("K");
+    Serial.print(" | Brillo: "); Serial.print(map(targetBri, 0, 255, 0, 100)); Serial.print("%");
+    Serial.print(" | Sol: "); Serial.print(alt);
+    
+    if (isDemoMode) Serial.print(" [DEMO]");
+    if (isNightMode) Serial.print(" [NOCHE]");
+    
+    Serial.println();
   }
 
   delay(30);
 }
 `;
+};
