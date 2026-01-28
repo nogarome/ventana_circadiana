@@ -22,7 +22,6 @@ import {
   Clock,
   Copy,
 } from "lucide-react";
-console.log("Despliegue automático funcionando");
 
 export const ArduinoDocs: React.FC = () => {
   const [currentTimeCmd, setCurrentTimeCmd] = useState("");
